@@ -33,9 +33,8 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() { // <-- Diubah dari 'protected' menjadi 'public'
         super.onResume();
-        // Memeriksa clipboard setiap kali aplikasi dibuka/di-fokuskan
         checkClipboardForUrl();
     }
 
@@ -48,7 +47,6 @@ public class MainActivity extends BridgeActivity {
                     CharSequence pasteData = clipData.getItemAt(0).getText();
                     if (pasteData != null) {
                         String url = pasteData.toString().trim();
-                        // Cek apakah berupa URL dan belum pernah di-prompt sebelumnya
                         if ((url.startsWith("http://") || url.startsWith("https://")) && !url.equals(lastPastedUrl)) {
                             showClipboardDialog(url);
                         }
@@ -67,7 +65,6 @@ public class MainActivity extends BridgeActivity {
                 .setMessage("Eh ada URL di clipboard kamu, mau langsung tempel?\n\n" + url)
                 .setPositiveButton("Ya", (dialog, which) -> {
                     lastPastedUrl = url;
-                    // Inject nilai URL langsung ke kolom input aplikasi
                     if (bridge != null && bridge.getWebView() != null) {
                         bridge.getWebView().evaluateJavascript(
                             "(function() { " +
