@@ -1,10 +1,16 @@
 package nimiyo.litedownloader;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
+import androidx.appcompat.app.AlertDialog;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private String lastPastedUrl = "";
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(MediaSaverPlugin.class);
@@ -24,6 +30,63 @@ public class MainActivity extends BridgeActivity {
                 }, 102);
             }
         }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Memeriksa clipboard setiap kali aplikasi dibuka/di-fokuskan
+        checkClipboardForUrl();
+    }
+
+    private void checkClipboardForUrl() {
+        try {
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null && clipboard.hasPrimaryClip()) {
+                ClipData clipData = clipboard.getPrimaryClip();
+                if (clipData != null && clipData.getItemCount() > 0) {
+                    CharSequence pasteData = clipData.getItemAt(0).getText();
+                    if (pasteData != null) {
+                        String url = pasteData.toString().trim();
+                        // Cek apakah berupa URL dan belum pernah di-prompt sebelumnya
+                        if ((url.startsWith("http://") || url.startsWith("https://")) && !url.equals(lastPastedUrl)) {
+                            showClipboardDialog(url);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void showClipboardDialog(final String url) {
+        runOnUiThread(() -> {
+            new AlertDialog.Builder(MainActivity.this)
+                .setTitle("Link Terdeteksi!")
+                .setMessage("Eh ada URL di clipboard kamu, mau langsung tempel?\n\n" + url)
+                .setPositiveButton("Ya", (dialog, which) -> {
+                    lastPastedUrl = url;
+                    // Inject nilai URL langsung ke kolom input aplikasi
+                    if (bridge != null && bridge.getWebView() != null) {
+                        bridge.getWebView().evaluateJavascript(
+                            "(function() { " +
+                            "  var input = document.querySelector('input[type=\"text\"]') || document.querySelector('input'); " +
+                            "  if(input) { " +
+                            "    input.value = '" + url + "'; " +
+                            "    input.dispatchEvent(new Event('input', {bubbles: true})); " +
+                            "    input.dispatchEvent(new Event('change', {bubbles: true})); " +
+                            "  } " +
+                            "})()", null
+                        );
+                    }
+                })
+                .setNegativeButton("Tidak", (dialog, which) -> {
+                    lastPastedUrl = url;
+                    dialog.dismiss();
+                })
+                .show();
+        });
     }
 
     @Override
