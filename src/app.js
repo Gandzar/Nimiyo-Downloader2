@@ -7090,3 +7090,135 @@ function checkRulesOnboarding() {
     }, 400);
   }
 }
+// --- FITUR AUTO-DETECT CLIPBOARD DENGAN POP-UP KUSTOM ---
+
+// CSS untuk tampilan Pop-Up Kustom (Bisa dikustomisasi warnanya di sini!)
+const modalStyles = `
+  .nimiyo-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 99999; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .nimiyo-modal-overlay.active {
+    opacity: 1; pointer-events: auto;
+  }
+  .nimiyo-modal-card {
+    background: #1e1e2e; /* Warna background pop-up */
+    color: #ffffff;
+    width: 85%; max-width: 380px;
+    padding: 22px;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    transform: scale(0.8);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-align: center;
+    font-family: sans-serif;
+  }
+  .nimiyo-modal-overlay.active .nimiyo-modal-card {
+    transform: scale(1);
+  }
+  .nimiyo-modal-icon {
+    font-size: 32px; margin-bottom: 8px;
+  }
+  .nimiyo-modal-title {
+    font-size: 18px; font-weight: bold; margin-bottom: 8px; color: #ff79c6;
+  }
+  .nimiyo-modal-text {
+    font-size: 14px; color: #a6adc8; margin-bottom: 12px; line-height: 1.4;
+  }
+  .nimiyo-modal-url {
+    background: #11111b; padding: 8px 12px; border-radius: 8px;
+    font-size: 12px; color: #89b4fa; word-break: break-all;
+    max-height: 50px; overflow-y: auto; margin-bottom: 18px;
+  }
+  .nimiyo-modal-buttons {
+    display: flex; gap: 10px;
+  }
+  .nimiyo-btn {
+    flex: 1; padding: 10px; border: none; border-radius: 10px;
+    font-weight: bold; cursor: pointer; font-size: 14px;
+    transition: background 0.2s;
+  }
+  .nimiyo-btn-cancel {
+    background: #313244; color: #cdd6f4;
+  }
+  .nimiyo-btn-confirm {
+    background: #89b4fa; color: #11111b;
+  }
+`;
+
+// Inject CSS ke halaman web
+const styleSheet = document.createElement("style");
+styleSheet.innerText = modalStyles;
+document.head.appendChild(styleSheet);
+
+// Buat Struktur HTML Pop-up
+const modalHTML = `
+  <div id="nimiyoClipboardModal" class="nimiyo-modal-overlay">
+    <div class="nimiyo-modal-card">
+      <div class="nimiyo-modal-icon">🔗</div>
+      <div class="nimiyo-modal-title">Link Terdeteksi!</div>
+      <div class="nimiyo-modal-text">Eh ada URL di clipboard kamu, mau langsung tempel?</div>
+      <div id="nimiyoModalUrl" class="nimiyo-modal-url">https://...</div>
+      <div class="nimiyo-modal-buttons">
+        <button id="nimiyoBtnCancel" class="nimiyo-btn nimiyo-btn-cancel">Tidak</button>
+        <button id="nimiyoBtnConfirm" class="nimiyo-btn nimiyo-btn-confirm">Ya, Tempel</button>
+      </div>
+    </div>
+  </div>
+`;
+
+document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+// Logika Pengecekan Clipboard
+let currentDetectedUrl = "";
+
+async function checkClipboardForUrl() {
+  try {
+    const text = await navigator.clipboard.readText();
+    
+    if (text && (text.startsWith('http://') || text.startsWith('https://'))) {
+      const lastPasted = sessionStorage.getItem('last_pasted_url');
+      if (lastPasted === text) return;
+
+      currentDetectedUrl = text;
+      document.getElementById('nimiyoModalUrl').innerText = text;
+      document.getElementById('nimiyoClipboardModal').classList.add('active');
+    }
+  } catch (err) {
+    console.log("Akses clipboard ditolak atau tidak didukung:", err);
+  }
+}
+
+// Event Tombol "Ya, Tempel"
+document.getElementById('nimiyoBtnConfirm').addEventListener('click', () => {
+  // Cari kolom input tempat menempel URL
+  const inputField = document.querySelector('input[type="text"]') || document.querySelector('input');
+  if (inputField) {
+    inputField.value = currentDetectedUrl;
+    // Trigger event agar logika JS aplikasi mendeteksi inputan baru
+    inputField.dispatchEvent(new Event('input', { bubbles: true }));
+    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  sessionStorage.setItem('last_pasted_url', currentDetectedUrl);
+  closeNimiyoModal();
+});
+
+// Event Tombol "Tidak"
+document.getElementById('nimiyoBtnCancel').addEventListener('click', () => {
+  sessionStorage.setItem('last_pasted_url', currentDetectedUrl);
+  closeNimiyoModal();
+});
+
+function closeNimiyoModal() {
+  document.getElementById('nimiyoClipboardModal').classList.remove('active');
+}
+
+// Jalankan saat aplikasi dibuka atau kembali fokus dari luar
+window.addEventListener('focus', checkClipboardForUrl);
+document.addEventListener('DOMContentLoaded', checkClipboardForUrl);
+
