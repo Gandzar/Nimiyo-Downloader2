@@ -7,6 +7,8 @@ import android.os.Build;
 import android.os.Bundle;
 import androidx.appcompat.app.AlertDialog;
 import com.getcapacitor.BridgeActivity;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends BridgeActivity {
     private String lastPastedUrl = "";
@@ -32,10 +34,13 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    // Menggunakan Focus Listener agar diizinkan membaca clipboard di Android 10+
     @Override
-    public void onResume() { // <-- Diubah dari 'protected' menjadi 'public'
-        super.onResume();
-        checkClipboardForUrl();
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            getWindow().getDecorView().post(this::checkClipboardForUrl);
+        }
     }
 
     private void checkClipboardForUrl() {
@@ -46,9 +51,13 @@ public class MainActivity extends BridgeActivity {
                 if (clipData != null && clipData.getItemCount() > 0) {
                     CharSequence pasteData = clipData.getItemAt(0).getText();
                     if (pasteData != null) {
-                        String url = pasteData.toString().trim();
-                        if ((url.startsWith("http://") || url.startsWith("https://")) && !url.equals(lastPastedUrl)) {
-                            showClipboardDialog(url);
+                        String fullText = pasteData.toString().trim();
+                        
+                        // Deteksi dan ambil hanya link/URL-nya saja
+                        String extractedUrl = extractUrl(fullText);
+
+                        if (extractedUrl != null && !extractedUrl.isEmpty() && !extractedUrl.equals(lastPastedUrl)) {
+                            showClipboardDialog(extractedUrl);
                         }
                     }
                 }
@@ -56,6 +65,16 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    // Fungsi otomatis penyaring URL/Link dari teks yang di-copy
+    private String extractUrl(String text) {
+        Pattern pattern = Pattern.compile("https?://\\S+");
+        Matcher matcher = pattern.matcher(text);
+        if (matcher.find()) {
+            return matcher.group(0);
+        }
+        return null;
     }
 
     private void showClipboardDialog(final String url) {
